@@ -1,9 +1,10 @@
 import torch
-from .optimizer import Optimizer, required
+import math
+from torch.optim.optimizer import Optimizer, required
 
 class SRGD(Optimizer):
     """ Implements Stochastic Relativistic Gradient Descent """
-    def __init__(self, params, lr=required, gamma, m, c):
+    def __init__(self, params, lr=required, gamma=0.5, m=0.1, c=3e7):
         if lr is not required and lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         defaults = dict(lr=lr, gamma=gamma, m = m, c = c)
@@ -12,7 +13,7 @@ class SRGD(Optimizer):
     def __setstate__(self, state):
         super(SRGD, self).__setstate__(state)
 
-[docs]    def step(self, closure=None):
+    def step(self, closure=None):
         """Performs a single optimization step.
 
         Arguments:
@@ -36,8 +37,10 @@ class SRGD(Optimizer):
 
                 # initialize state
                 if len(state) == 0:
-                    
+                    state["p"] = torch.zeros_like(p.data)
 
-                p.data.add_(-group['lr'], d_p)
+                state["p"] = math.exp(- group["gamma"] * group["lr"]) * state["p"] - group["lr"] * d_p
+
+                p.data.add_(group['lr'] * group["c"] * state["p"] / torch.sqrt(torch.sum(state["p"] * state["p"]) + math.pow(group["m"] * group["c"], 2) ))
 
         return loss
